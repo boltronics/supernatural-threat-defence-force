@@ -1,0 +1,235 @@
+#!/usr/bin/env python3
+# SPDX-License_identifier: GPL-3.0-or-later
+#
+# This file is part of Supernatural Threat Defence Force
+#
+# Supernatural Threat Defence Force is free software: you can
+# redistribute it and/or modify it under the terms of the GNU General
+# Public License as published by the Free Software Foundation, either
+# version 3 of the License, or (at your option) any later version.
+#
+# Supernatural Threat Defence Force is distributed in the hope that it
+# will be useful, but WITHOUT ANY WARRANTY; without even the implied
+# warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Supernatural Threat Defence Force.  If not, see
+# <http://www.gnu.org/licenses/>.
+#
+
+"""\
+Supernatural Threat Defence Force
+"""
+
+import argparse
+import random
+from textwrap import dedent
+
+class Enemy():
+    """Create a random enemy"""
+
+    def __init__(self):
+        self.health = int(random.triangular(1, 10, 3))
+        self.shields = random.randrange(0, 3, 1)
+        self.speed = random.randrange(2, 7, 1)
+        enemy_types = {
+            'Alpha Vampire': 8,
+            'Angel': 6,
+            'Archangel': 8,
+            'Daemon': 2,
+            'Death': 7,
+            'Famine': 7,
+            'Knight of Hell': 7,
+            'Leviathan': 3,
+            'Pestilence': 7,
+            'Reaper': 4,
+            'The Darkness': 9,
+            'Vampire': 2,
+            'Vengeful Spirit': 4,
+            'War': 7,
+            'Werewolf': 3,
+            'Witch': 5
+        }
+        self.name, self.damage = random.choice(list(enemy_types.items()))
+
+    def __str__(self):
+        output = """\
+        Enemy: {0}
+        Damage: {1}
+        Health: {2}
+        Defence: {3}
+        Speed: {4}\
+        """.format(self.name, self.damage, self.health, self.shields,
+                   self.speed)
+        return dedent(output).strip()
+
+
+class WarPath():
+    """Paths attackers approach from"""
+
+    def __init__(self):
+        self.length = 15
+        self.attack_path = ['-'] * self.length
+        x_point = random.randint(0, self.length - 3)
+        y_point = random.randint(x_point, self.length - 2)
+        z_point = self.length - 1
+        self.attack_path[x_point] = 'X'
+        self.attack_path[y_point] = 'Y'
+        self.attack_path[z_point] = 'Z'
+
+    def __str__(self):
+        output = ""
+        for step in self.attack_path:
+            output += "{0} ".format(step)
+        return output.strip()
+
+
+class Card():
+    """Cards defining possible player actions"""
+
+    def __init__(self):
+        action = ('attack', 'heal', 'conjure mana')
+        movement = ('north/south', 'east/west')
+        self.action = random.choice(action)
+        self.direction = random.choice(movement)
+
+    def __str__(self):
+        return "Action: {0}, Movement: {1}".format(self.action,
+                                                   self.direction)
+
+
+class Player():
+    """Player details and stats"""
+
+    def __init__(self, start_cards=6, start_mana=5):
+        self.cards = [Card() for x in range(0, start_cards)]
+        self.mana = start_mana
+
+    def __str__(self):
+        output = dedent("""\
+        Player:
+          Mana: {0}
+          Cards:\
+        """.format(self.mana)).strip()
+        for card in self.cards:
+            output += "\n    - {0}".format(card.__str__())
+        return output
+
+
+class HauntedLocation():
+    """Create a haunted location"""
+
+    def __init__(self):
+        location_types = [
+            'Cavern',
+            'Forest',
+            'Ghost Town',
+            'Mansion',
+            'Nightmare'
+        ]
+        self.name = random.choice(location_types)
+        self.sections = []
+        self.assign_sections(6)
+
+    def __str__(self):
+        output = "Location: {0}".format(self.name)
+        for section in self.sections:
+            output += "\n{0}".format(section.__str__())
+        return output
+
+    def assign_sections(self, sections):
+        """Assign sections to a location"""
+        self.sections.append(LocationSection())
+        sections -= 1
+
+        # Select a random location and attempt to attach a room. If
+        # successful, decrement sections by 1 until we have the
+        # required number of location sections.
+        while sections > 0:
+            for result in random.choice(self.sections).attach_section():
+                self.sections.append(result)
+                sections -= 1
+
+
+class LocationSection():
+    """Create a defensive area at a location"""
+
+    def __init__(self, north=None, east=None, south=None, west=None):
+        self.directions = {
+            'north': {'section': north},
+            'east': {'section': east},
+            'south': {'section': south},
+            'west': {'section': west}}
+        self.safety = 6
+        self.protection = 2
+        self.war_path = None
+
+    def __str__(self):
+        output = "Sections:"
+        for direction, visible in self.directions.items():
+            if visible['section']:
+                output += "\n  - {0}".format(direction[0:1].upper())
+        return output
+
+    def attach_section(self, locations=1):
+        """Create and attach a new adjacent section"""
+        results = []
+        try:
+            chosen_directions = random.sample(
+                [x for x in self.directions.keys()
+                 if not self.directions[x]['section']],
+                locations
+            )
+        except ValueError:
+            # locations requested is set greater than the number of
+            # unused directions remaining, so we failed to add any.
+            return results
+        for direction in chosen_directions:
+            if direction == "north":
+                results.append(LocationSection(south=self))
+                self.directions[direction]['section'] = results[-1]
+            elif direction == "east":
+                results.append(LocationSection(west=self))
+                self.directions[direction]['section'] = results[-1]
+            elif direction == "south":
+                results.append(LocationSection(north=self))
+                self.directions[direction]['section'] = results[-1]
+            elif direction == "west":
+                results.append(LocationSection(east=self))
+                self.directions[direction]['section'] = results[-1]
+        return results
+
+
+def parse_arguments():
+    """Parse command line arguments"""
+    parser = argparse.ArgumentParser(
+        prog='Supernatural Threat Defence Force',
+        description="""\
+        Defend against supernatural threats until a protection barrier spell
+        is complete.\
+        """)
+    parser.add_argument(
+        '-v', '--version', action='version', version="STDF (%(prog)s) 0.0.1")
+    return parser.parse_args()
+
+def main():
+    """Begin execution"""
+    parse_arguments()
+
+    player = Player()
+    print(player)
+
+    enemy = Enemy()
+    print(enemy)
+
+    war_paths = []
+    for path in list(range(0, 3)):
+        war_paths.append(WarPath())
+        print(war_paths[path])
+
+    location = HauntedLocation()
+    print(location)
+
+if __name__ == "__main__":
+    main()
